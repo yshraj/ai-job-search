@@ -1,0 +1,19 @@
+{
+  "name": "foundit-cli",
+  "version": "1.0.0",
+  "description": "CLI for searching jobs on Foundit.in (formerly Monster India) — India's public job portal. No authentication, zero runtime dependencies. Personal use only.",
+  "type": "module",
+  "main": "src/cli.ts",
+  "bin": {
+    "foundit-search": "src/cli.ts"
+  },
+  "scripts": {
+    "start": "bun run src/cli.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "@types/bun": "latest"
+  }
+}

@@ -52,12 +52,12 @@ Or manually: fork on GitHub, then clone your fork.
 ## 3. Install job search CLI dependencies
 
 ```bash
-for tool in jobbank-search jobdanmark-search jobindex-search jobnet-search linkedin-search; do
+for tool in jobbank-search jobdanmark-search jobindex-search jobnet-search linkedin-search foundit-search; do
   cd .agents/skills/$tool/cli && bun install && cd ../../../..
 done
 ```
 
-For `linkedin-search` the install is optional: it has zero runtime dependencies and runs with plain `bun`; `bun install` only pulls TypeScript dev types.
+For `linkedin-search` and `foundit-search` the install is optional: they have zero runtime dependencies and run with plain `bun`; `bun install` only pulls TypeScript dev types.
 
 ## 4. Run the setup interview
 
