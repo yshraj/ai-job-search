@@ -2,6 +2,13 @@
 
 <!-- SETUP: Customize these queries based on your skills, target roles, and location -->
 
+## Portal CLIs (preferred by /scrape)
+
+When `/scrape` runs, it maps these queries to **installed** portal-search CLIs under
+`.agents/skills/` (see `job-scraper/SKILL.md` Step 1). Replace placeholders below,
+then the agent runs e.g. `linkedin-search search -q "..." -l "..."` instead of
+WebSearch for those portals. WebSearch remains the fallback for sites without a CLI.
+
 ## Search Sites
 
 Primary (Danish job market):

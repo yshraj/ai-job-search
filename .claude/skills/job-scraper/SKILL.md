@@ -1,9 +1,11 @@
 ---
 name: job-scraper
 description: >
-  Scrapes Danish job sites for new positions matching your profile. Deduplicates across runs.
-  Triggers on: job scrape, find jobs, search jobs, new jobs, job search, scrape jobs, /scrape
-allowed-tools: Read, Write, Edit, Glob, Grep, WebFetch, WebSearch, Agent, AskUserQuestion
+  Finds new job postings matching your profile via installed portal-search CLIs
+  (LinkedIn, local job boards, and any skills added with /add-portal). Deduplicates
+  across runs. Triggers on: job scrape, find jobs, search jobs, new jobs, job search,
+  scrape jobs, /scrape
+allowed-tools: Read, Write, Edit, Glob, Grep, WebFetch, WebSearch, Agent, AskUserQuestion, Bash(bun run .agents/skills/*-search/cli/src/cli.ts *)
 ---
 
 # Job Scraper
@@ -12,7 +14,10 @@ allowed-tools: Read, Write, Edit, Glob, Grep, WebFetch, WebSearch, Agent, AskUse
 
 ## How It Works
 
-This skill searches multiple Danish job sites using targeted queries based on your profile, deduplicates against previously seen jobs and the application tracker, and presents new matches with a quick fit assessment.
+This skill searches job portals using the **installed portal-search CLIs** in
+`.agents/skills/` (plus WebSearch as a fallback), using queries from your profile.
+It deduplicates against previously seen jobs and the application tracker, and
+presents new matches with a quick fit assessment.
 
 ## Invocation
 
@@ -38,20 +43,55 @@ Optional arguments:
 
 ### Step 1: Search
 
-Run **WebSearch** queries from `search-queries.md`. By default, run the top 3 priority categories. If the user said "broad", run all categories.
+**Primary path — portal CLIs (preferred).** Before any WebSearch, discover which
+portal-search skills are installed:
 
-If the user specified a focus area (e.g. "data science"), prioritize queries from that category.
+```bash
+# List installed portal skills (any folder matching *-search with a cli/)
+ls .agents/skills/*-search/cli/src/cli.ts
+```
 
-For each search:
-- Use `WebSearch` with site-specific queries (jobindex.dk, linkedin.com/jobs, karriere.dk, etc.)
+For each installed skill, read its `SKILL.md` for flags, then run live searches
+mapped from `search-queries.md` priority categories. By default, run Priority 1–3;
+if the user said `broad`, run all categories.
+
+**Query → CLI mapping (adapt placeholders from search-queries.md):**
+
+| Skill | Example command |
+|-------|-----------------|
+| `linkedin-search` | `bun run .agents/skills/linkedin-search/cli/src/cli.ts search -q "<title or skill>" -l "<city, region, country>" --jobage 14 --format json` |
+| `jobindex-search` | `bun run .agents/skills/jobindex-search/cli/src/cli.ts search -q "<title> <city>" --format json` |
+| `jobnet-search` | `bun run .agents/skills/jobnet-search/cli/src/cli.ts search -q "<title>" --format json` |
+| `jobbank-search` | `bun run .agents/skills/jobbank-search/cli/src/cli.ts search -q "<title>" --format json` |
+| `jobdanmark-search` | `bun run .agents/skills/jobdanmark-search/cli/src/cli.ts search -q "<title>" --format json` |
+| Any `/add-portal` skill | Same pattern: `bun run .agents/skills/<name>/cli/src/cli.ts search ...` per its SKILL.md |
+
+Run **parallel** Bash calls when multiple skills apply (e.g. LinkedIn + a local board).
+Parse each JSON response: `results[]` with `id`, `title`, `company`, `location`, `date`, `url`.
+
+If the user specified a focus area (e.g. "/scrape data science"), prioritize matching
+queries and add 2–3 custom CLI searches for that focus.
+
+**Fallback — WebSearch.** Use only when:
+- No portal CLI covers a site listed in `search-queries.md` (e.g. company `site:` queries)
+- A CLI command fails or returns zero results (note the failure, then try WebSearch for that query)
+
+For WebSearch fallbacks:
+- Use site-specific queries from `search-queries.md` (jobindex.dk, linkedin.com/jobs, etc.)
 - Target your configured geographic area
-- Look for postings from the last 14 days
+- Prefer postings from the last 14 days
 
 ### Step 2: Fetch & Parse
 
-For each promising result from Step 1:
-- Use `WebFetch` to retrieve the job posting page
-- Extract: **job title**, **company**, **location**, **posting date** (or "recent"), **URL**, **key requirements** (brief), **application deadline** (if listed)
+**From CLI results:** Each search result already includes title, company, location,
+date, and URL. For jobs worth a deeper look (high/medium fit candidates), fetch full
+detail with the same skill's `detail` command (see its SKILL.md) to extract **key
+requirements**, **application deadline**, and a brief description snippet.
+
+**From WebSearch results:** Use `WebFetch` on the posting URL and extract the same
+fields manually.
+
+For every candidate:
 - Skip if the URL or company+title combo already exists in `seen_jobs.json`
 - Skip if the company+role already appears in `job_search_tracker.csv`
 
@@ -117,9 +157,9 @@ If the user decides to apply to any job, add a row to `job_search_tracker.csv`.
 
 ## Important Rules
 
-1. **Never fabricate job postings.** Only present jobs found via actual WebSearch/WebFetch results.
+1. **Never fabricate job postings.** Only present jobs from actual CLI search/detail output or WebSearch/WebFetch results.
 2. **Respect deduplication.** Always check seen_jobs.json AND job_search_tracker.csv before presenting.
 3. **Focus on configured geographic area.** Skip jobs that require relocation or are clearly outside commute range.
 4. **Only open positions.** Skip postings with expired deadlines or those marked as closed.
-5. **Be efficient with WebFetch.** Don't fetch every search result - use titles and snippets to pre-filter before fetching.
-6. **Parallel searches.** Use the Agent tool or parallel WebSearch calls to speed up the search phase.
+5. **Be efficient with detail fetches.** Don't run `detail` on every search hit — pre-filter by title/snippet, then detail only promising matches.
+6. **Parallel searches.** Run portal CLI searches in parallel; use WebSearch only for gaps the CLIs don't cover.
